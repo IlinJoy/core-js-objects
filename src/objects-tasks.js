@@ -289,21 +289,6 @@ function group(array, keySelector, valueSelector) {
   return res;
 }
 
-console.log(
-  group(
-    [
-      { country: 'Belarus', city: 'Brest' },
-      { country: 'Russia', city: 'Omsk' },
-      { country: 'Russia', city: 'Samara' },
-      { country: 'Belarus', city: 'Grodno' },
-      { country: 'Belarus', city: 'Minsk' },
-      { country: 'Poland', city: 'Lodz' },
-    ],
-    (item) => item.country,
-    (item) => item.city
-  )
-);
-
 /**
  * Css selectors builder
  *
@@ -358,33 +343,117 @@ console.log(
  *  For more examples see unit tests.
  */
 
+const ERROR = {
+  RANGE:
+    'Selector parts should be arranged in the following order: element, id, class, attribute, pseudo-class, pseudo-element',
+  OCCURRENCE:
+    'Element, id and pseudo-element should not occur more then one time inside the selector',
+};
+
+function Selector({ value, order, isUniq = true }) {
+  const checkOrder = (newSelector) => {
+    if (order > newSelector.order) throw new Error(ERROR.RANGE);
+  };
+
+  const checkOccurrence = (newSelector) => {
+    if (isUniq && newSelector.order === order)
+      throw new Error(ERROR.OCCURRENCE);
+  };
+
+  function setNext(newSelector) {
+    checkOccurrence(newSelector);
+    checkOrder(newSelector);
+    this.next = newSelector;
+  }
+
+  return { value, order, isUniq, next: null, setNext };
+}
+
+class SelectorString {
+  constructor() {
+    this.head = null;
+    this.tail = null;
+  }
+
+  element(value) {
+    return this.queue({ value, order: 1 });
+  }
+
+  id(value) {
+    return this.queue({ value: `#${value}`, order: 2 });
+  }
+
+  class(value) {
+    return this.queue({ value: `.${value}`, order: 3, isUniq: false });
+  }
+
+  attr(value) {
+    return this.queue({ value: `[${value}]`, order: 4, isUniq: false });
+  }
+
+  pseudoClass(value) {
+    return this.queue({ value: `:${value}`, order: 5, isUniq: false });
+  }
+
+  pseudoElement(value) {
+    return this.queue({ value: `::${value}`, order: 6 });
+  }
+
+  addString(string) {
+    return this.queue({ value: string, order: 0, isUniq: false });
+  }
+
+  stringify() {
+    let result = '';
+    let current = this.head;
+    while (current) {
+      result += current.value;
+      current = current.next;
+    }
+    return result;
+  }
+
+  queue(data) {
+    if (!this.head) {
+      this.head = new Selector(data);
+      this.tail = this.head;
+    } else {
+      this.tail.setNext(new Selector(data));
+      this.tail = this.tail.next;
+    }
+    return this;
+  }
+}
+
 const cssSelectorBuilder = {
-  element(/* value */) {
-    throw new Error('Not implemented');
+  element(value) {
+    return new SelectorString().element(value);
   },
 
-  id(/* value */) {
-    throw new Error('Not implemented');
+  id(value) {
+    return new SelectorString().id(value);
   },
 
-  class(/* value */) {
-    throw new Error('Not implemented');
+  class(value) {
+    return new SelectorString().class(value);
   },
 
-  attr(/* value */) {
-    throw new Error('Not implemented');
+  attr(value) {
+    return new SelectorString().attr(value);
   },
 
-  pseudoClass(/* value */) {
-    throw new Error('Not implemented');
+  pseudoClass(value) {
+    return new SelectorString().pseudoClass(value);
   },
 
-  pseudoElement(/* value */) {
-    throw new Error('Not implemented');
+  pseudoElement(value) {
+    return new SelectorString().pseudoElement(value);
   },
 
-  combine(/* selector1, combinator, selector2 */) {
-    throw new Error('Not implemented');
+  combine(selector1, combinator, selector2) {
+    const strings = [selector1.stringify(), selector2.stringify()];
+    const combined = strings.join(` ${combinator} `);
+    return new SelectorString().addString(combined);
   },
 };
 
