@@ -351,22 +351,27 @@ const ERROR = {
 };
 
 function Selector({ value, order, isUniq = true }) {
-  const checkOrder = (newSelector) => {
-    if (order > newSelector.order) throw new Error(ERROR.RANGE);
+  this.value = value;
+  this.order = order;
+  this.isUniq = isUniq;
+  this.next = null;
+
+  this.checkOrder = (newSelector) => {
+    if (this.order > newSelector.order) throw new Error(ERROR.RANGE);
   };
 
-  const checkOccurrence = (newSelector) => {
-    if (isUniq && newSelector.order === order)
+  this.checkOccurrence = (newSelector) => {
+    if (this.isUniq && newSelector.order === this.order)
       throw new Error(ERROR.OCCURRENCE);
   };
 
-  function setNext(newSelector) {
-    checkOccurrence(newSelector);
-    checkOrder(newSelector);
-    this.next = newSelector;
-  }
-
-  return { value, order, isUniq, next: null, setNext };
+  Object.defineProperty(this, 'nextSelector', {
+    set(newSelector) {
+      this.checkOccurrence(newSelector);
+      this.checkOrder(newSelector);
+      this.next = newSelector;
+    },
+  });
 }
 
 class SelectorString {
@@ -418,7 +423,7 @@ class SelectorString {
       this.head = new Selector(data);
       this.tail = this.head;
     } else {
-      this.tail.setNext(new Selector(data));
+      this.tail.nextSelector = new Selector(data);
       this.tail = this.tail.next;
     }
     return this;
@@ -456,6 +461,25 @@ const cssSelectorBuilder = {
     return new SelectorString().addString(combined);
   },
 };
+const builder = cssSelectorBuilder;
+console.log(
+  builder
+    .combine(
+      builder.element('div').id('main').class('container').class('draggable'),
+      '+',
+      builder.combine(
+        builder.element('table').id('data'),
+        '~',
+        builder.combine(
+          builder.element('tr').pseudoClass('nth-of-type(even)'),
+          ' ',
+          builder.element('td').pseudoClass('nth-of-type(even)')
+        )
+      )
+    )
+    .stringify()
+);
+// return { value, order, isUniq, next: null, setNext };
 
 module.exports = {
   shallowCopy,
